@@ -1,6 +1,10 @@
 export type ViewLocation = "sidebar" | "main";
 
 export interface OpenCodeSettings {
+  defaultWorkingDirectory: string;
+  terminalFontSize: number;
+  terminalFontFamily: string;
+  newSessionArgs: string;
   port: number;
   hostname: string;
   autoStart: boolean;
@@ -16,6 +20,10 @@ export interface OpenCodeSettings {
 }
 
 export const DEFAULT_SETTINGS: OpenCodeSettings = {
+  defaultWorkingDirectory: "",
+  terminalFontSize: 12,
+  terminalFontFamily: "monospace",
+  newSessionArgs: "",
   port: 14096,
   hostname: "127.0.0.1",
   autoStart: false,

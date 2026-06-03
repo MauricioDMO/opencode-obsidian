@@ -1,301 +1,271 @@
-import { Plugin, WorkspaceLeaf, Notice, EventRef, MarkdownView } from "obsidian";
-import { OpenCodeSettings, DEFAULT_SETTINGS, OPENCODE_VIEW_TYPE } from "./types";
-import { OpenCodeView } from "./ui/OpenCodeView";
-import { ViewManager } from "./ui/ViewManager";
-import { OpenCodeSettingTab } from "./settings/SettingsTab";
-import { ServerManager, ServerState } from "./server/ServerManager";
-import { registerOpenCodeIcons, OPENCODE_ICON_NAME } from "./icons";
-import { OpenCodeClient } from "./client/OpenCodeClient";
-import { ContextManager } from "./context/ContextManager";
-import { ExecutableResolver } from "./server/ExecutableResolver";
+import { Editor, EditorPosition, EditorSuggest, EditorSuggestContext, FileSystemAdapter, MarkdownView, Plugin, WorkspaceLeaf } from "obsidian";
+import { DEFAULT_SETTINGS, OpenCodeSettings } from "./types";
+import { OpencodeTerminalSettingTab } from "./settings/OpencodeTerminalSettingTab";
+import { OpencodeTerminalView, OPENCODE_TERMINAL_VIEW_TYPE } from "./ui/OpencodeTerminalView";
+import { OpencodeConversationView, OPENCODE_CONVERSATION_VIEW_TYPE } from "./ui/OpencodeConversationView";
+import { ServerState } from "./server/types";
+
+interface OpencodeSuggestion {
+  label: string;
+  description: string;
+}
+
+class OpencodeEditorSuggest extends EditorSuggest<OpencodeSuggestion> {
+  constructor(private plugin: OpenCodePlugin) {
+    super(plugin.app);
+  }
+
+  onTrigger(cursor: EditorPosition, editor: Editor, file: any): EditorSuggestContext | null {
+    const line = editor.getLine(cursor.line);
+    const textBeforeCursor = line.substring(0, cursor.ch);
+    const match = textBeforeCursor.match(/@opencode\s(.*)$/);
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      start: { line: cursor.line, ch: cursor.ch - match[0].length },
+      end: cursor,
+      query: match[1],
+      editor,
+      file,
+    };
+  }
+
+  getSuggestions(context: EditorSuggestContext): OpencodeSuggestion[] {
+    return [{ label: "Send to OpenCode", description: context.query || "Type your prompt..." }];
+  }
+
+  renderSuggestion(suggestion: OpencodeSuggestion, el: HTMLElement): void {
+    el.createEl("div", { cls: "opencode-suggest-title", text: suggestion.label });
+    if (suggestion.description) {
+      el.createEl("small", { cls: "opencode-suggest-desc", text: suggestion.description });
+    }
+  }
+
+  selectSuggestion(): void {
+    const context = this.context;
+    if (!context) {
+      return;
+    }
+
+    const { editor, start, end } = context;
+    const fullLine = editor.getLine(start.line);
+    const beforeTrigger = fullLine.substring(0, start.ch);
+    const afterTrigger = fullLine.substring(end.ch);
+    const promptText = fullLine.substring(start.ch, end.ch).replace(/^@opencode\s*/, "").trim();
+    editor.replaceRange(beforeTrigger.trimEnd() + afterTrigger, { line: start.line, ch: 0 }, { line: start.line, ch: fullLine.length });
+
+    if (promptText) {
+      this.plugin.pendingPrompt = promptText;
+      void this.plugin.newSession();
+    }
+
+    this.close();
+  }
+}
 
 export default class OpenCodePlugin extends Plugin {
   settings: OpenCodeSettings = DEFAULT_SETTINGS;
-  private processManager: ServerManager;
-  private stateChangeCallbacks: Array<(state: ServerState) => void> = [];
-  private openCodeClient: OpenCodeClient;
-  private contextManager: ContextManager;
-  private viewManager: ViewManager;
-  private cachedIframeUrl: string | null = null;
-  private lastBaseUrl: string | null = null;
+  vaultRoot = "";
+  vaultConfigDir = "";
+  pendingPrompt: string | null = null;
+  sessionArgs: string[] | null = null;
+  sessionCwd: string | null = null;
 
   async onload(): Promise<void> {
-    console.log("Loading OpenCode plugin");
-
-    registerOpenCodeIcons();
-
     await this.loadSettings();
 
-    // Attempt autodetect if opencodePath is empty and not using custom command
-    await this.attemptAutodetect();
-
-    const projectDirectory = this.getProjectDirectory();
-
-    this.processManager = new ServerManager(this.settings, projectDirectory);
-    this.processManager.on("stateChange", (state: ServerState) => {
-      this.notifyStateChange(state);
-    });
-
-    // Listen for project directory changes and coordinate response
-    this.processManager.on("projectDirectoryChanged", async (newDirectory: string) => {
-      this.settings.projectDirectory = newDirectory;
-      await this.saveData(this.settings);
-      this.refreshClientState();
-      if (this.getServerState() === "running") {
-        await this.stopServer();
-        await this.startServer();
-      }
-    });
-
-    this.openCodeClient = new OpenCodeClient(
-      this.getApiBaseUrl(),
-      this.getServerUrl(),
-      projectDirectory
-    );
-    this.lastBaseUrl = this.getServerUrl();
-
-    this.contextManager = new ContextManager({
-      app: this.app,
-      settings: this.settings,
-      client: this.openCodeClient,
-      getServerState: () => this.getServerState(),
-      getCachedIframeUrl: () => this.cachedIframeUrl,
-      setCachedIframeUrl: (url) => {
-        this.cachedIframeUrl = url;
-      },
-      registerEvent: (ref) => this.registerEvent(ref),
-    });
-
-    this.viewManager = new ViewManager({
-      app: this.app,
-      settings: this.settings,
-      client: this.openCodeClient,
-      contextManager: this.contextManager,
-      getCachedIframeUrl: () => this.cachedIframeUrl,
-      setCachedIframeUrl: (url) => {
-        this.cachedIframeUrl = url;
-      },
-      getServerState: () => this.getServerState(),
-    });
-
-    console.log(
-      "[OpenCode] Configured with project directory:",
-      projectDirectory
-    );
-
-    this.registerView(
-      OPENCODE_VIEW_TYPE,
-      (leaf) => new OpenCodeView(leaf, this)
-    );
-    this.addSettingTab(new OpenCodeSettingTab(
-      this.app,
-      this,
-      this.settings,
-      this.processManager,
-      () => this.saveSettings()
-    ));
-
-    this.addRibbonIcon(OPENCODE_ICON_NAME, "OpenCode", () => {
-      void this.viewManager.activateView();
-    });
-
-    this.addCommand({
-      id: "toggle-opencode-view",
-      name: "Toggle OpenCode panel",
-      callback: () => {
-        void this.viewManager.toggleView();
-      },
-      hotkeys: [
-        {
-          modifiers: ["Mod", "Shift"],
-          key: "o",
-        },
-      ],
-    });
-
-    this.addCommand({
-      id: "start-opencode-server",
-      name: "Start OpenCode server",
-      callback: () => {
-        this.startServer();
-      },
-    });
-
-    this.addCommand({
-      id: "stop-opencode-server",
-      name: "Stop OpenCode server",
-      callback: () => {
-        this.stopServer();
-      },
-    });
-
-    if (this.settings.autoStart) {
-      this.app.workspace.onLayoutReady(async () => {
-        await this.startServer();
-      });
+    if (this.app.vault.adapter instanceof FileSystemAdapter) {
+      this.vaultRoot = this.app.vault.adapter.getBasePath();
+    } else {
+      this.vaultRoot = "/";
     }
+    this.vaultConfigDir = this.app.vault.configDir;
 
-    this.contextManager.updateSettings(this.settings);
-    this.processManager.on("stateChange", (state: ServerState) => {
-      if (state === "running") {
-        void this.contextManager.handleServerRunning();
-      }
+    this.registerView(OPENCODE_TERMINAL_VIEW_TYPE, (leaf) => new OpencodeTerminalView(leaf, this));
+    this.registerView(OPENCODE_CONVERSATION_VIEW_TYPE, (leaf) => new OpencodeConversationView(leaf, this));
+
+    this.addRibbonIcon("terminal", "OpenCode Terminal", () => {
+      void this.activateTerminalView();
+    });
+    this.addRibbonIcon("message-circle", "OpenCode Conversations", () => {
+      void this.activateConversationView();
     });
 
-    this.registerCleanupHandlers();
+    this.addCommand({
+      id: "open-opencode-terminal",
+      name: "Open OpenCode Terminal",
+      callback: () => void this.activateTerminalView(),
+    });
+    this.addCommand({
+      id: "toggle-opencode-terminal-sidebar",
+      name: "Toggle OpenCode Terminal in Sidebar",
+      callback: () => void this.toggleTerminalSidebar(),
+    });
+    this.addCommand({
+      id: "open-opencode-conversations",
+      name: "Open OpenCode Conversations",
+      callback: () => void this.activateConversationView(),
+    });
+    this.addCommand({
+      id: "new-opencode-session",
+      name: "New OpenCode Session",
+      callback: () => void this.newSession(),
+    });
+    this.addCommand({
+      id: "continue-last-opencode-session",
+      name: "Continue Last OpenCode Session",
+      callback: () => void this.continueLastSession(),
+    });
 
-    console.log("OpenCode plugin loaded");
+    this.addSettingTab(new OpencodeTerminalSettingTab(this.app, this));
+    this.registerEditorSuggest(new OpencodeEditorSuggest(this));
   }
 
-  async onunload(): Promise<void> {
-    this.contextManager.destroy();
-    await this.stopServer();
-    this.app.workspace.detachLeavesOfType(OPENCODE_VIEW_TYPE);
+  onunload(): void {
+    this.app.workspace.detachLeavesOfType(OPENCODE_TERMINAL_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(OPENCODE_CONVERSATION_VIEW_TYPE);
   }
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
 
-  /**
-   * Attempt to autodetect opencode executable on startup
-   * Triggers when opencodePath is empty and useCustomCommand is false
-   */
-  private async attemptAutodetect(): Promise<void> {
-    // Only autodetect if path is empty and not using custom command mode
-    if (this.settings.opencodePath || this.settings.useCustomCommand) {
+  async saveSettings(): Promise<void> {
+    await this.saveData(this.settings);
+  }
+
+  async activateTerminalView(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf = workspace.getLeavesOfType(OPENCODE_TERMINAL_VIEW_TYPE)[0];
+    if (!leaf) {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        leaf = rightLeaf;
+        await leaf.setViewState({ type: OPENCODE_TERMINAL_VIEW_TYPE, active: true });
+      }
+    }
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async activateConversationView(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf = workspace.getLeavesOfType(OPENCODE_CONVERSATION_VIEW_TYPE)[0];
+    if (!leaf) {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        leaf = rightLeaf;
+        await leaf.setViewState({ type: OPENCODE_CONVERSATION_VIEW_TYPE, active: true });
+      }
+    }
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async toggleTerminalSidebar(): Promise<void> {
+    const { workspace } = this.app;
+    const rightSplit = (workspace as any).rightSplit;
+    const isCollapsed = rightSplit?.collapsed ?? true;
+
+    if (isCollapsed) {
+      rightSplit?.toggle();
+    }
+
+    let leaf = workspace.getLeavesOfType(OPENCODE_TERMINAL_VIEW_TYPE)[0];
+    if (!leaf) {
+      const newLeaf = workspace.getRightLeaf(false);
+      if (newLeaf) {
+        leaf = newLeaf;
+        await leaf.setViewState({ type: OPENCODE_TERMINAL_VIEW_TYPE, active: true });
+      }
+    }
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async newSession(): Promise<void> {
+    this.sessionArgs = [];
+    this.sessionCwd = null;
+    await this.openOrRestartTerminal();
+  }
+
+  async continueLastSession(): Promise<void> {
+    this.sessionArgs = ["-c"];
+    this.sessionCwd = null;
+    await this.openOrRestartTerminal();
+  }
+
+  async openTerminalWithSession(sessionId: string, directory: string): Promise<void> {
+    this.sessionArgs = ["-s", sessionId];
+    this.sessionCwd = directory;
+    await this.openOrRestartTerminal();
+  }
+
+  async openOrRestartTerminal(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf: WorkspaceLeaf | undefined = workspace.getLeavesOfType(OPENCODE_TERMINAL_VIEW_TYPE)[0];
+
+    if (leaf) {
+      const view = leaf.view as any;
+      if (view && typeof view.restartPty === "function") {
+        view.restartPty();
+      }
+      workspace.revealLeaf(leaf);
       return;
     }
 
-    console.log("[OpenCode] Attempting to autodetect opencode executable...");
-
-    const detectedPath = ExecutableResolver.resolve("opencode");
-    
-    // Check if a different path was found (not the fallback)
-    if (detectedPath && detectedPath !== "opencode") {
-      console.log("[OpenCode] Autodetected opencode at:", detectedPath);
-      this.settings.opencodePath = detectedPath;
-      await this.saveData(this.settings);
-      new Notice(`OpenCode executable found at ${detectedPath}`);
-    } else {
-      console.log("[OpenCode] Could not autodetect opencode executable");
-      new Notice("Could not find opencode. Please check Settings");
+    const rightLeaf = workspace.getRightLeaf(false);
+    if (rightLeaf) {
+      await rightLeaf.setViewState({ type: OPENCODE_TERMINAL_VIEW_TYPE, active: true });
+      workspace.revealLeaf(rightLeaf);
     }
-  }
-
-  async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
-    this.processManager.updateSettings(this.settings);
-    this.refreshClientState();
-    this.contextManager.updateSettings(this.settings);
-    this.viewManager.updateSettings(this.settings);
-  }
-
-  async startServer(): Promise<boolean> {
-    const success = await this.processManager.start();
-    if (success) {
-      new Notice("OpenCode server started");
-      const initialized = await this.openCodeClient.initializeProject();
-      if (!initialized) {
-        console.warn("[OpenCode] Failed to initialize project on server");
-      }
-    } else {
-      const error = this.processManager.getLastError();
-      if (error) {
-        new Notice(`OpenCode failed to start: ${error}`, 10000); // Show for 10 seconds
-      } else {
-        new Notice("OpenCode failed to start. Check Settings for details.", 5000);
-      }
-    }
-    return success;
-  }
-
-  async stopServer(): Promise<void> {
-    await this.processManager.stop();
-    new Notice("OpenCode server stopped");
-  }
-
-  getServerState(): ServerState {
-    return this.processManager.getState() ?? "stopped";
-  }
-
-  getLastError(): string | null {
-    return this.processManager.getLastError() ?? null;
-  }
-
-  getServerUrl(): string {
-    return this.processManager.getUrl();
-  }
-
-  getApiBaseUrl(): string {
-    return `http://${this.settings.hostname}:${this.settings.port}`;
-  }
-
-  getStoredIframeUrl(): string | null {
-    return this.cachedIframeUrl;
-  }
-
-  setCachedIframeUrl(url: string | null): void {
-    this.cachedIframeUrl = url;
   }
 
   onServerStateChange(callback: (state: ServerState) => void): () => void {
-    this.stateChangeCallbacks.push(callback);
-    return () => {
-      const index = this.stateChangeCallbacks.indexOf(callback);
-      if (index > -1) {
-        this.stateChangeCallbacks.splice(index, 1);
-      }
-    };
+    callback("stopped");
+    return () => undefined;
   }
 
-  private notifyStateChange(state: ServerState): void {
-    for (const callback of this.stateChangeCallbacks) {
-      callback(state);
-    }
+  getServerState(): ServerState {
+    return "stopped";
   }
 
-  private refreshClientState(): void {
-    const nextUiBaseUrl = this.getServerUrl();
-    const nextApiBaseUrl = this.getApiBaseUrl();
-    const projectDirectory = this.getProjectDirectory();
-    this.openCodeClient.updateBaseUrl(nextApiBaseUrl, nextUiBaseUrl, projectDirectory);
-
-    if (this.lastBaseUrl && this.lastBaseUrl !== nextUiBaseUrl) {
-      this.cachedIframeUrl = null;
-    }
-
-    this.lastBaseUrl = nextUiBaseUrl;
+  getLastError(): string | null {
+    return null;
   }
 
-  refreshContextForView(view: OpenCodeView): void {
-    void this.contextManager.refreshContextForView(view);
+  getServerUrl(): string {
+    return "";
   }
 
-  async ensureSessionUrl(view: OpenCodeView): Promise<void> {
-    await this.viewManager.ensureSessionUrl(view);
+  getStoredIframeUrl(): string | null {
+    return null;
   }
 
-  getProjectDirectory(): string {
-    if (this.settings.projectDirectory) {
-      console.log("[OpenCode] Using project directory from settings:", this.settings.projectDirectory);
-      return this.settings.projectDirectory;
-    }
-    const adapter = this.app.vault.adapter as any;
-    const vaultPath = adapter.basePath || "";
-    if (!vaultPath) {
-      console.warn("[OpenCode] Warning: Could not determine vault path");
-    }
-    console.log("[OpenCode] Using vault path as project directory:", vaultPath);
-    return vaultPath;
+  setCachedIframeUrl(_url: string | null): void {
+    return;
   }
 
-  private registerCleanupHandlers(): void {
-    this.registerEvent(
-      this.app.workspace.on("quit", () => {
-        console.log("[OpenCode] Obsidian quitting - performing sync cleanup");
-        this.stopServer();
-      })
-    );
+  async startServer(): Promise<boolean> {
+    await this.activateTerminalView();
+    return true;
+  }
+
+  async stopServer(): Promise<void> {
+    return;
+  }
+
+  refreshContextForView(..._args: unknown[]): void {
+    return;
+  }
+
+  async ensureSessionUrl(..._args: unknown[]): Promise<void> {
+    return;
   }
 }
