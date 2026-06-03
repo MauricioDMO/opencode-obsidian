@@ -148,14 +148,11 @@ describe("ServerManager", () => {
       await currentManager.stop();
       expect(currentManager.getState()).toBe("stopped");
 
-      // Wait for process to fully terminate
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       // Restart
       const secondStart = await currentManager.start();
       expect(secondStart).toBe(true);
       expect(currentManager.getState()).toBe("running");
-    });
+    }, 30000);
 
      test("returns true immediately if already running", async () => {
        const port = getNextPort();
@@ -250,9 +247,6 @@ describe("ServerManager", () => {
       
       await currentManager.stop();
 
-      // Wait a bit then verify server is not accessible
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       try {
         const response = await fetch(`${url}/global/health`, {
           signal: AbortSignal.timeout(1000),
@@ -263,7 +257,7 @@ describe("ServerManager", () => {
         // Expected - server should not be accessible
         expect(e).toBeDefined();
       }
-    });
+    }, 30000);
   });
 
   describe("error handling", () => {

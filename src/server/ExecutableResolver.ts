@@ -1,7 +1,8 @@
 import { existsSync } from "fs";
-import { homedir, platform } from "os";
+import { platform } from "os";
 import { join, basename, isAbsolute } from "path";
 import { execSync } from "child_process";
+import { getOpencodeEnv, getOpencodeSearchDirectories } from "./OpencodeEnv";
 
 /**
  * Resolves the opencode executable path across different platforms.
@@ -52,7 +53,11 @@ export class ExecutableResolver {
     try {
       // Use 'which' on Unix systems, 'where' on Windows
       const command = platform() === "win32" ? "where" : "which";
-      const result = execSync(`${command} "${execName}"`, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
+      const result = execSync(`${command} "${execName}"`, {
+        encoding: "utf-8",
+        env: getOpencodeEnv(),
+        stdio: ["pipe", "pipe", "ignore"],
+      });
       const path = result.trim().split("\n")[0];
       if (path && existsSync(path)) {
         return path;
@@ -67,67 +72,6 @@ export class ExecutableResolver {
    * Get platform-specific directories to search for executables
    */
   private static getSearchDirectories(): string[] {
-    const currentPlatform = platform();
-    const homeDir = homedir();
-    const searchDirs: string[] = [];
-
-    if (currentPlatform === "linux" || currentPlatform === "darwin") {
-      // User directories
-      searchDirs.push(
-        join(homeDir, ".local", "bin"),
-        join(homeDir, ".opencode", "bin"),
-        join(homeDir, ".bun", "bin"),
-        join(homeDir, ".npm-global", "bin")
-      );
-
-      // nvm directories (expand wildcard)
-      const nvmDirs = this.expandNvmDirectories(homeDir);
-      searchDirs.push(...nvmDirs);
-
-      // System directories
-      searchDirs.push("/usr/local/bin", "/usr/bin");
-
-      // macOS-specific directories
-      if (currentPlatform === "darwin") {
-        searchDirs.push("/opt/homebrew/bin");
-      }
-    } else if (currentPlatform === "win32") {
-      // Windows directories with environment variable expansion
-      const localAppData = process.env.LOCALAPPDATA || join(homeDir, "AppData", "Local");
-      const userProfile = process.env.USERPROFILE || homeDir;
-
-      searchDirs.push(
-        join(localAppData, "opencode", "bin"),
-        join(userProfile, ".bun", "bin"),
-        join(userProfile, ".local", "bin")
-      );
-    }
-
-    return searchDirs;
-  }
-
-  /**
-   * Expand nvm wildcard directories
-   * Searches ~/.nvm/versions/node/ for installed versions
-   */
-  private static expandNvmDirectories(homeDir: string): string[] {
-    const nvmBaseDir = join(homeDir, ".nvm", "versions", "node");
-    const nvmDirs: string[] = [];
-
-    try {
-      if (existsSync(nvmBaseDir)) {
-        const { readdirSync } = require("fs");
-        const versions = readdirSync(nvmBaseDir, { withFileTypes: true });
-        for (const version of versions) {
-          if (version.isDirectory()) {
-            nvmDirs.push(join(nvmBaseDir, version.name, "bin"));
-          }
-        }
-      }
-    } catch {
-      // nvm directory doesn't exist or is not accessible
-    }
-
-    return nvmDirs;
+    return getOpencodeSearchDirectories({ platform: platform() });
   }
 }

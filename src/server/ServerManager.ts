@@ -6,6 +6,7 @@ import { OpenCodeProcess } from "./process/OpenCodeProcess";
 import { WindowsProcess } from "./process/WindowsProcess";
 import { PosixProcess } from "./process/PosixProcess";
 import { ExecutableResolver } from "./ExecutableResolver";
+import { getOpencodeEnv } from "./OpencodeEnv";
 
 export type { ServerState } from "./types";
 
@@ -65,12 +66,14 @@ export class ServerManager extends EventEmitter {
     let executablePath: string;
     let spawnOptions: SpawnOptions;
     
+    const opencodeEnv = { ...getOpencodeEnv(), NODE_USE_SYSTEM_CA: "1" };
+
     if (this.settings.useCustomCommand) {
       // Custom command mode: use custom command directly with shell
       executablePath = this.settings.customCommand;
       spawnOptions = {
         cwd: this.projectDirectory,
-        env: { ...process.env, NODE_USE_SYSTEM_CA: "1" },
+        env: opencodeEnv,
         stdio: ["ignore", "pipe", "pipe"],
         shell: true,
       };
@@ -86,7 +89,7 @@ export class ServerManager extends EventEmitter {
       
       spawnOptions = {
         cwd: this.projectDirectory,
-        env: { ...process.env, NODE_USE_SYSTEM_CA: "1" },
+        env: opencodeEnv,
         stdio: ["ignore", "pipe", "pipe"],
       };
     }
