@@ -49,8 +49,11 @@ export function getOpencodeEnv(options: OpencodeEnvOptions = {}): NodeJS.Process
 
 export function getOpencodeSearchDirectories(options: OpencodeEnvOptions = {}): string[] {
   const context = createContext(options);
-  const dirs = getBaseSearchDirectories(context);
-  dirs.push(...getFnmNodeDirectories(context));
+  const dirs = [
+    ...getUserSearchDirectories(context),
+    ...getFnmNodeDirectories(context),
+    ...getSystemSearchDirectories(context),
+  ];
   return unique(dirs);
 }
 
@@ -65,7 +68,7 @@ function createContext(options: OpencodeEnvOptions): EnvContext {
   };
 }
 
-function getBaseSearchDirectories(context: EnvContext): string[] {
+function getUserSearchDirectories(context: EnvContext): string[] {
   if (context.platform === "win32") {
     const userProfile = context.env.USERPROFILE || context.homeDir;
     const appData = context.env.APPDATA || join(userProfile, "AppData", "Roaming");
@@ -86,6 +89,15 @@ function getBaseSearchDirectories(context: EnvContext): string[] {
     join(context.homeDir, ".local", "share", "pnpm"),
     join(context.homeDir, ".bun", "bin"),
     join(context.homeDir, ".cargo", "bin"),
+  ];
+}
+
+function getSystemSearchDirectories(context: EnvContext): string[] {
+  if (context.platform === "win32") {
+    return [];
+  }
+
+  return [
     "/usr/local/bin",
     "/opt/homebrew/bin",
     "/usr/bin",

@@ -25,6 +25,10 @@ describe("OpencodeEnv", () => {
     expect(pathParts).toContain(join(homeDir, ".cargo", "bin"));
     expect(pathParts).toContain("/opt/homebrew/bin");
     expect(pathParts).toContain(join(versionsDir, "v20.0.0", "installation", "bin"));
+    expect(pathParts.indexOf(join(versionsDir, "v20.0.0", "installation", "bin"))).toBeLessThan(pathParts.indexOf("/usr/local/bin"));
+    expect(pathParts.indexOf(join(versionsDir, "v20.0.0", "installation", "bin"))).toBeLessThan(pathParts.indexOf("/opt/homebrew/bin"));
+    expect(pathParts.indexOf(join(versionsDir, "v20.0.0", "installation", "bin"))).toBeLessThan(pathParts.indexOf("/usr/bin"));
+    expect(pathParts.indexOf(join(versionsDir, "v20.0.0", "installation", "bin"))).toBeLessThan(pathParts.indexOf("/bin"));
     expect(pathParts[pathParts.length - 1]).toBe("/existing/bin");
     expect(env.PNPM_HOME).toBe(join(homeDir, ".local", "share", "pnpm"));
     expect(env.FNM_DIR).toBe(join(homeDir, ".local", "share", "fnm"));
