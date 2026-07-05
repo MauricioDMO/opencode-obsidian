@@ -159,10 +159,31 @@ export class OpencodeConversationView extends ItemView {
       const msgEl = messages.createEl("div", { cls: `opencode-message opencode-message-${role}` });
       const header = msgEl.createEl("div", { cls: "opencode-message-header" });
       header.createEl("span", { cls: "opencode-message-role", text: roleLabel });
-      header.createEl("span", { cls: "opencode-message-time", text: moment(msg.info.time.created).format("HH:mm:ss") });
+      const headerActions = header.createEl("div", { cls: "opencode-message-header-actions" });
+      const messageText = this.getMessageText(msg.parts || []);
+      if (messageText) {
+        headerActions.createEl("button", { cls: "opencode-message-copy", text: "Copiar" }).addEventListener("click", async (event) => {
+          event.stopPropagation();
+          try {
+            await navigator.clipboard.writeText(messageText);
+            new Notice("Mensaje copiado");
+          } catch {
+            new Notice("No se pudo copiar el mensaje");
+          }
+        });
+      }
+      headerActions.createEl("span", { cls: "opencode-message-time", text: moment(msg.info.time.created).format("HH:mm:ss") });
       const body = msgEl.createEl("div", { cls: "opencode-message-body" });
       this.renderParts(body, msg.parts || []);
     }
+  }
+
+  private getMessageText(parts: any[]): string {
+    return parts
+      .filter((part) => part.type === "text" && part.text)
+      .map((part) => part.text)
+      .join("\n\n")
+      .trim();
   }
 
   private renderParts(container: HTMLElement, parts: any[]): void {
