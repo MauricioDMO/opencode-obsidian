@@ -1,3 +1,5 @@
+> Archived legacy note: this design documents the original iframe/server MVP and is superseded by the current integrated terminal implementation.
+
 ## Context
 
 This plugin embeds the OpenCode AI assistant into Obsidian by spawning a local server process and displaying its web UI in an iframe within the Obsidian sidebar. The design prioritizes simplicity and reliability for the MVP.

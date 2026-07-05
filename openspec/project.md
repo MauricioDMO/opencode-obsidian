@@ -1,13 +1,14 @@
 # Project Context
 
 ## Purpose
-Obsidian plugin that embeds the OpenCode AI assistant via an iframe. The plugin spawns a local OpenCode server process and displays its web UI in the Obsidian sidebar, enabling AI-assisted coding and note-taking within Obsidian.
+Obsidian plugin that runs the OpenCode AI assistant inside an integrated Obsidian terminal. The plugin starts a PTY-backed child process that executes the configured `opencode` executable with configured arguments and working directory, enabling AI-assisted coding and note-taking within Obsidian.
 
 ## Tech Stack
 - **TypeScript** - Primary language with strict null checks
 - **Obsidian Plugin API** - For UI integration, views, settings, and commands
 - **esbuild** - Bundler (ES2018 target, CommonJS output)
-- **Node.js child_process** - For spawning the OpenCode server process
+- **Node.js child_process** - For spawning the PTY helper and OpenCode process
+- **xterm.js** - Integrated terminal rendering and terminal addons
 - **Bun** - Package manager and runtime
 
 ## Project Conventions
@@ -21,8 +22,7 @@ Obsidian plugin that embeds the OpenCode AI assistant via an iframe. The plugin 
 - Relative paths with `./` prefix
 
 ```typescript
-import { Plugin, WorkspaceLeaf, Notice } from "obsidian";
-import { spawn, ChildProcess } from "child_process";
+import { Plugin, WorkspaceLeaf } from "obsidian";
 import type OpenCodePlugin from "./main";
 import { OpenCodeSettings, DEFAULT_SETTINGS } from "./types";
 ```
@@ -30,12 +30,12 @@ import { OpenCodeSettings, DEFAULT_SETTINGS } from "./types";
 **Naming Conventions:**
 | Type | Convention | Example |
 |------|------------|---------|
-| Classes | PascalCase | `OpenCodePlugin`, `ProcessManager` |
+| Classes | PascalCase | `OpenCodePlugin`, `OpencodeTerminalView` |
 | Interfaces/Types | PascalCase | `OpenCodeSettings`, `ProcessState` |
-| Constants | UPPER_CASE or camelCase | `DEFAULT_SETTINGS`, `OPENCODE_VIEW_TYPE` |
+| Constants | UPPER_CASE or camelCase | `DEFAULT_SETTINGS`, `OPENCODE_TERMINAL_VIEW_TYPE` |
 | Variables/functions | camelCase | `getVaultPath`, `startServer` |
 | Private members | camelCase (no prefix) | `private processManager` |
-| Files | PascalCase for classes | `ProcessManager.ts`, `OpenCodeView.ts` |
+| Files | PascalCase for classes | `OpencodeTerminalView.ts`, `OpencodeConversationView.ts` |
 
 **TypeScript Patterns:**
 - `strictNullChecks` enabled - always handle null/undefined
@@ -48,12 +48,14 @@ import { OpenCodeSettings, DEFAULT_SETTINGS } from "./types";
 **Project Structure:**
 ```
 src/
-├── main.ts           # Plugin entry, extends Plugin
-├── types.ts          # Types and constants
-├── OpenCodeView.ts   # Sidebar view (ItemView) with iframe
-├── ProcessManager.ts # Server process lifecycle
-├── SettingsTab.ts    # Settings UI (PluginSettingTab)
-└── icons.ts          # Custom icon registration
+├── main.ts                            # Plugin entry, commands, terminal/session activation
+├── types.ts                           # Active settings and terminal keybinding types
+├── ui/OpencodeTerminalView.ts         # Integrated terminal view and PTY launch
+├── ui/OpencodeConversationView.ts     # Session browser/export/restore view
+├── ui/TerminalDrop.ts                 # Drag/drop text handling for terminal input
+├── settings/OpencodeTerminalSettingTab.ts # Visible settings UI
+├── server/OpencodeEnv.ts              # Environment preparation for OpenCode
+└── server/EditorServer.ts             # Editor transport lock/server for OpenCode integration
 ```
 
 **Obsidian Patterns:**
@@ -65,7 +67,7 @@ src/
 
 **State Management:**
 - Callback-based subscriptions for state changes
-- Centralized state in manager classes (ProcessManager)
+- Terminal/session launch state is kept in `OpenCodePlugin` (`pendingPrompt`, `sessionArgs`, `sessionCwd`) and consumed by `OpencodeTerminalView`
 - Immediate notification on state change via callbacks
 
 **Error Handling:**
@@ -76,38 +78,39 @@ src/
 - Silent catch for non-critical ops (health checks)
 
 ### Testing Strategy
-Not currently configured. If adding tests:
-- Use Vitest for test runner
-- Place tests in `src/__tests__/` or `*.test.ts` files
-- Add ESLint with `@typescript-eslint/parser` for linting
+- Use Bun's test runner for tests under `tests/`
+- `bun run build` performs TypeScript checking and bundling
 
 ### Git Workflow
 Standard feature branch workflow. Commit messages should be concise and describe the change.
 
 ## Domain Context
 
-**OpenCode Server:**
-- OpenCode is an AI assistant CLI that can run as a web server
-- The plugin spawns `opencode serve` with port/hostname/CORS flags
-- Server health is checked via `/global/health` endpoint
-- Project directory is encoded as base64 in the URL path
+**OpenCode Terminal:**
+- OpenCode is an AI assistant CLI run directly in an integrated terminal
+- `OpencodeTerminalView` starts a PTY helper and executes `opencode` with configured args
+- `OpenCode path` controls the executable, defaulting to `opencode`
+- `Default working directory` controls cwd, falling back to the vault root when empty
+- `New session arguments` are appended for normal new sessions
+- `Continue Last OpenCode Session` starts the terminal with `-c`
+- Restoring a conversation starts the terminal with `-s <sessionId>` and the session cwd
+- `getOpencodeEnv()` augments PATH and default PNPM/FNM variables before spawning
 
 **Obsidian Integration:**
-- View is registered with `OPENCODE_VIEW_TYPE` constant
-- Opens in right sidebar by default
-- Supports lazy start (starts server when view opens)
-- Auto-start option available in settings
+- Terminal view is registered with `OPENCODE_TERMINAL_VIEW_TYPE`
+- Conversation browser is registered with `OPENCODE_CONVERSATION_VIEW_TYPE`
+- Views open in the right sidebar
+- `startServer()` is a compatibility shim that activates the terminal view; it does not start `opencode serve`
 
-**Process States:**
-- `stopped` - Server not running
-- `starting` - Server spawn initiated, waiting for health check
-- `running` - Server healthy and responding
-- `error` - Server failed to start or crashed
+**Legacy Server/Iframe Code:**
+- Older versions used `opencode serve` and an iframe, with settings such as `port`, `hostname`, `autoStart`, `defaultViewLocation`, `injectWorkspaceContext`, `customCommand`, and `useCustomCommand`
+- Those settings are not active in the current terminal workflow and should not be documented as visible/current options
 
 ## Important Constraints
 
 **Desktop Only:**
 - Uses Node.js APIs (`child_process.spawn()`) unavailable on mobile
+- The current PTY implementation is Unix-oriented; Windows is not implemented in `OpencodeTerminalView`
 - File system access via vault adapter requires desktop
 - Check for desktop environment before adding mobile-incompatible features
 
@@ -125,7 +128,7 @@ Standard feature branch workflow. Commit messages should be concise and describe
 
 **Runtime:**
 - OpenCode CLI must be installed on user's system (configurable path)
-- Default port: 14096, hostname: 127.0.0.1
+- No OpenCode server port/hostname is required for the current workflow
 
 **Development:**
 - `obsidian` - Obsidian API types and runtime

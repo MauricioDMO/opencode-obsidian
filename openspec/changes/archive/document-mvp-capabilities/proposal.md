@@ -1,3 +1,5 @@
+> Archived legacy note: this change documents the original iframe/server MVP and is superseded by the current integrated terminal implementation.
+
 # Change: Document MVP Capabilities
 
 ## Why

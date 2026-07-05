@@ -1,3 +1,5 @@
+> Archived legacy note: this requirement belongs to the original iframe/server MVP. The current terminal implementation opens views in the right sidebar and does not expose default view location settings.
+
 ## MODIFIED Requirements
 
 ### Requirement: Settings Configuration

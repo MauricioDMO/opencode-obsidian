@@ -1,150 +1,83 @@
 ## ADDED Requirements
 
-### Requirement: Server Process Spawning
-The plugin SHALL spawn the OpenCode server process using the configured executable path, port, and hostname when the user initiates server start.
+### Requirement: Integrated Terminal Launch
+The plugin SHALL run OpenCode inside an integrated Obsidian terminal rather than requiring `opencode serve` or an iframe.
 
-#### Scenario: Successful server spawn
-- **WHEN** the user starts the server
-- **THEN** the plugin spawns `opencode serve --port <port> --hostname <hostname> --cors app://obsidian.md`
-- **AND** the process runs with the vault directory as the working directory
+#### Scenario: Terminal view activation
+- **WHEN** the user clicks the terminal ribbon icon or runs `Open OpenCode Terminal`
+- **THEN** the plugin opens or reveals the `opencode-terminal` ItemView in the right sidebar
+- **AND** the view renders an xterm.js terminal
 
-### Requirement: Server Health Checking
-The plugin SHALL verify server availability by polling a health endpoint during startup.
+#### Scenario: PTY process spawn
+- **WHEN** the terminal view opens
+- **THEN** the plugin starts a PTY-backed child process
+- **AND** executes the configured `OpenCode path` value, defaulting to `opencode`
+- **AND** passes configured new-session arguments for a normal launch
+- **AND** uses the configured default working directory, or the vault root if the setting is empty
 
-#### Scenario: Health check during startup
-- **WHEN** the server process is spawned
-- **THEN** the plugin polls `GET /global/health` every 500ms
-- **AND** transitions to running state when the endpoint returns HTTP 200
-- **AND** transitions to error state if 15 seconds elapse without success
+#### Scenario: Environment preparation
+- **WHEN** the OpenCode process is spawned
+- **THEN** the plugin prepares the environment with `getOpencodeEnv()`
+- **AND** augments `PATH` with common user-level OpenCode, pnpm, bun, cargo, system, and fnm Node directories
+- **AND** sets default `PNPM_HOME` and `FNM_DIR` values when they are missing
 
-#### Scenario: Existing server detected
-- **WHEN** the user starts the server
-- **AND** a server is already running on the configured port
-- **THEN** the plugin reuses the existing server
-- **AND** transitions directly to running state
+### Requirement: Session Commands
+The plugin SHALL provide commands for starting fresh sessions, continuing the last session, and restoring known sessions.
 
-### Requirement: Server Shutdown
-The plugin SHALL gracefully terminate the server process when stopping.
+#### Scenario: New session command
+- **WHEN** the user runs `New OpenCode Session`
+- **THEN** the plugin opens or restarts the terminal
+- **AND** launches OpenCode without forced session flags
 
-#### Scenario: Graceful shutdown
-- **WHEN** the user stops the server
-- **THEN** the plugin sends SIGTERM to the process
-- **AND** sends SIGKILL after 2 seconds if the process is still running
+#### Scenario: Continue last session command
+- **WHEN** the user runs `Continue Last OpenCode Session`
+- **THEN** the plugin opens or restarts the terminal
+- **AND** launches OpenCode with `-c`
 
-### Requirement: Process State Management
-The plugin SHALL maintain a state machine with states: stopped, starting, running, and error.
+#### Scenario: Restore conversation in terminal
+- **WHEN** the user opens the conversations view and clicks `Restore in Terminal`
+- **THEN** the plugin opens or restarts the terminal
+- **AND** launches OpenCode with `-s <sessionId>`
+- **AND** uses the restored session's recorded working directory
 
-#### Scenario: State transitions
-- **WHEN** the server is not running
-- **THEN** the state is `stopped`
-- **WHEN** spawn is initiated
-- **THEN** the state transitions to `starting`
-- **WHEN** health check succeeds
-- **THEN** the state transitions to `running`
-- **WHEN** spawn fails or health check times out
-- **THEN** the state transitions to `error`
+### Requirement: Conversation Browser
+The plugin SHALL provide an Obsidian view for listing, inspecting, exporting, restoring, and deleting OpenCode sessions.
 
-### Requirement: Sidebar View Registration
-The plugin SHALL register an ItemView that displays in either the Obsidian sidebar or main editor area based on user settings.
+#### Scenario: Conversation view activation
+- **WHEN** the user clicks the conversations ribbon icon or runs `Open OpenCode Conversations`
+- **THEN** the plugin opens or reveals the `opencode-conversations` ItemView in the right sidebar
+- **AND** lists sessions from the OpenCode CLI using the configured executable and cwd
 
-#### Scenario: View activation in sidebar
-- **WHEN** the user clicks the ribbon icon or runs the toggle command
-- **AND** the default view location is set to "sidebar"
-- **THEN** the OpenCode view opens in the right sidebar
-- **AND** if the view already exists, it is revealed
+#### Scenario: Export session to note
+- **WHEN** the user selects a session and clicks `Export to Note`
+- **THEN** the plugin exports the session content through the OpenCode CLI
+- **AND** writes or updates a Markdown note under `OpenCode/`
 
-#### Scenario: View activation in main area
-- **WHEN** the user clicks the ribbon icon or runs the toggle command
-- **AND** the default view location is set to "main"
-- **THEN** the OpenCode view opens as a new tab in the main editor area
-- **AND** if the view already exists in any location, it is revealed
+### Requirement: Visible Settings
+The plugin SHALL expose settings that are active in the integrated terminal workflow.
 
-### Requirement: View State Rendering
-The plugin SHALL render different UI content based on the current process state.
+#### Scenario: OpenCode path setting
+- **WHEN** the user configures `OpenCode path`
+- **THEN** the value is used as the executable for terminal sessions and conversation CLI operations
 
-#### Scenario: Stopped state UI
-- **WHEN** the process state is `stopped`
-- **THEN** the view displays a "Start OpenCode" button
+#### Scenario: Default working directory setting
+- **WHEN** the user configures `Default working directory`
+- **THEN** the value is used as the cwd for new terminal sessions and conversation CLI operations
+- **AND** an empty value falls back to the vault root
 
-#### Scenario: Starting state UI
-- **WHEN** the process state is `starting`
-- **THEN** the view displays a loading spinner with "Starting OpenCode..." message
+#### Scenario: New session arguments setting
+- **WHEN** the user configures `New session arguments`
+- **THEN** the whitespace-separated arguments are added when starting a normal terminal session
 
-#### Scenario: Running state UI
-- **WHEN** the process state is `running`
-- **THEN** the view displays a header with controls and an iframe loading the server URL
+#### Scenario: Terminal presentation settings
+- **WHEN** the user configures terminal font size, font family, or keybindings
+- **THEN** the integrated terminal uses those values on the next render or key event
 
-#### Scenario: Error state UI
-- **WHEN** the process state is `error`
-- **THEN** the view displays an error message with "Retry" and "Open Settings" buttons
+### Requirement: Legacy Server Flow Is Not Current
+The current plugin SHALL NOT document `opencode serve`, iframe embedding, server port/hostname, CORS, auto-start server, custom command mode, or workspace context injection as active primary behavior.
 
-### Requirement: Iframe Controls
-The plugin SHALL provide controls in the view header when the server is running.
-
-#### Scenario: Header controls available
-- **WHEN** the server is running
-- **THEN** the header displays reload and stop buttons
-- **AND** clicking reload refreshes the iframe
-- **AND** clicking stop terminates the server
-
-### Requirement: Lazy Server Start
-The plugin SHALL start the server automatically when the view is opened if not already running.
-
-#### Scenario: Auto-start on view open
-- **WHEN** the user opens the OpenCode view
-- **AND** the server is in `stopped` state
-- **THEN** the plugin initiates server start
-
-### Requirement: Settings Configuration
-The plugin SHALL provide configurable settings for server port, hostname, executable path, project directory, auto-start behavior, and default view location.
-
-#### Scenario: Settings persistence
-- **WHEN** the user modifies settings
-- **THEN** changes are persisted to plugin data
-- **AND** the process manager is updated with new settings
-
-#### Scenario: Default view location options
-- **WHEN** the user configures default view location
-- **THEN** the options available are "sidebar" and "main"
-- **AND** the default value is "sidebar"
-
-### Requirement: Project Directory Validation
-The plugin SHALL validate the project directory setting and support tilde expansion.
-
-#### Scenario: Valid absolute path
-- **WHEN** the user enters an absolute path or path starting with ~
-- **AND** the path exists and is a directory
-- **THEN** the setting is saved with the expanded path
-
-#### Scenario: Invalid path rejection
-- **WHEN** the user enters a relative path or non-existent path
-- **THEN** a notice is displayed explaining the error
-- **AND** the setting is not saved
-
-### Requirement: Project Directory Auto-Restart
-The plugin SHALL restart the server when the project directory setting changes while running.
-
-#### Scenario: Restart on directory change
-- **WHEN** the user changes the project directory
-- **AND** the server is currently running
-- **THEN** the plugin stops and restarts the server with the new directory
-
-### Requirement: Commands Registration
-The plugin SHALL register commands for toggling the view and controlling the server.
-
-#### Scenario: Toggle command
-- **WHEN** the user runs "Toggle OpenCode panel" command or presses Mod+Shift+O
-- **THEN** the view opens if closed, or closes if open
-
-#### Scenario: Start and stop commands
-- **WHEN** the user runs "Start OpenCode server" command
-- **THEN** the server starts
-- **WHEN** the user runs "Stop OpenCode server" command
-- **THEN** the server stops
-
-### Requirement: Ribbon Icon
-The plugin SHALL add a ribbon icon that activates the OpenCode view in the configured default location.
-
-#### Scenario: Ribbon icon click
-- **WHEN** the user clicks the OpenCode ribbon icon
-- **THEN** the OpenCode view is activated in the location specified by the default view location setting
+#### Scenario: Server compatibility shim
+- **WHEN** legacy code calls `startServer()` on the plugin
+- **THEN** the method activates the integrated terminal view
+- **AND** does not spawn `opencode serve`
+- **AND** does not use port, hostname, or CORS settings

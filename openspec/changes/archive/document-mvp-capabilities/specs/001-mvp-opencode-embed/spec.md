@@ -1,3 +1,5 @@
+> Archived legacy note: these requirements describe the original iframe/server MVP and are superseded by the current integrated terminal implementation.
+
 ## ADDED Requirements
 
 ### Requirement: Server Process Spawning
