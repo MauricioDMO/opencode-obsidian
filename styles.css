@@ -193,6 +193,7 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  background: var(--background-primary);
 }
 
 .opencode-conversation-header {
@@ -220,28 +221,36 @@
   min-width: 200px;
   border-right: 1px solid var(--background-modifier-border);
   overflow-y: auto;
+  padding: 8px;
+  background: var(--background-secondary);
 }
 
 .opencode-session-detail {
   flex: 1;
   min-width: 0;
-  padding: 12px;
+  padding: 16px;
   overflow-y: auto;
 }
 
 .opencode-session-item {
-  padding: 8px 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
   cursor: pointer;
-  border-bottom: 1px solid var(--background-modifier-border);
-  transition: background-color 0.1s;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+  transition: background-color 0.1s, border-color 0.1s, box-shadow 0.1s;
 }
 
 .opencode-session-item:hover {
   background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
 }
 
 .opencode-session-item.is-active {
   background-color: var(--background-modifier-active-hover);
+  border-color: var(--interactive-accent);
+  box-shadow: inset 3px 0 0 var(--interactive-accent);
 }
 
 .opencode-session-title {
@@ -256,6 +265,7 @@
   font-size: 0.8em;
   color: var(--text-muted);
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -263,7 +273,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  max-width: 100%;
 }
 
 .opencode-session-actions {
@@ -276,7 +286,8 @@
 .opencode-session-info {
   background: var(--background-secondary);
   padding: 10px;
-  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
   margin-bottom: 12px;
   font-size: 0.85em;
 }
@@ -284,36 +295,70 @@
 .opencode-messages {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
 }
 
 .opencode-message {
-  border-radius: 6px;
-  padding: 10px;
+  width: min(820px, 92%);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  padding: 12px 14px;
   background: var(--background-secondary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .opencode-message-user {
-  border-left: 3px solid var(--interactive-accent);
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
 }
 
 .opencode-message-assistant {
-  border-left: 3px solid var(--text-success);
+  align-self: flex-start;
+  background: var(--background-secondary);
+  border-color: color-mix(in srgb, var(--text-success) 45%, var(--background-modifier-border));
 }
 
 .opencode-message-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   font-size: 0.75em;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   color: var(--text-muted);
+}
+
+.opencode-message-role {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 700;
+  background: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.opencode-message-user .opencode-message-role {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.opencode-message-assistant .opencode-message-role {
+  background: color-mix(in srgb, var(--text-success) 22%, var(--background-modifier-border));
+  color: var(--text-normal);
+}
+
+.opencode-message-time {
+  white-space: nowrap;
 }
 
 .opencode-message-text {
   white-space: pre-wrap;
   word-break: break-word;
+  line-height: 1.5;
 }
 
 .opencode-message-step {
@@ -325,6 +370,10 @@
   color: var(--text-accent);
   font-family: monospace;
   font-size: 0.85em;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--background-primary);
 }
 
 .opencode-suggest-title {
@@ -343,4 +392,21 @@
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+@media (max-width: 720px) {
+  .opencode-conversation-main {
+    flex-direction: column;
+  }
+
+  .opencode-session-list {
+    width: auto;
+    max-height: 34%;
+    border-right: 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .opencode-message {
+    width: 100%;
+  }
 }

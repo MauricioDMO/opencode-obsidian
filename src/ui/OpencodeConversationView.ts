@@ -154,9 +154,11 @@ export class OpencodeConversationView extends ItemView {
 
     const messages = this.detailContainer.createEl("div", { cls: "opencode-messages" });
     for (const msg of data.messages || []) {
-      const msgEl = messages.createEl("div", { cls: `opencode-message opencode-message-${msg.info.role}` });
+      const role = msg.info.role || "unknown";
+      const roleLabel = role === "user" ? "Tú" : role === "assistant" ? "IA" : role;
+      const msgEl = messages.createEl("div", { cls: `opencode-message opencode-message-${role}` });
       const header = msgEl.createEl("div", { cls: "opencode-message-header" });
-      header.createEl("span", { cls: "opencode-message-role", text: msg.info.role });
+      header.createEl("span", { cls: "opencode-message-role", text: roleLabel });
       header.createEl("span", { cls: "opencode-message-time", text: moment(msg.info.time.created).format("HH:mm:ss") });
       const body = msgEl.createEl("div", { cls: "opencode-message-body" });
       this.renderParts(body, msg.parts || []);
