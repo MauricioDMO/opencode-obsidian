@@ -2,12 +2,12 @@
   "name": "obsidian-opencode",
   "version": "0.2.1",
   "description": "Run OpenCode AI assistant in an Obsidian terminal",
-  "main": "main.js",
+  "main": "dist/main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "bunx tsc -noEmit -skipLibCheck && bun run esbuild.config.mjs production",
     "test": "bun test",
-    "version": "bun run scripts/sync-manifest-version.ts && git add manifest.json",
+    "version": "bun run scripts/sync-manifest-version.ts && git add meta/manifest.json",
     "version:patch": "bun pm version patch && git push --follow-tags",
     "version:minor": "bun pm version minor && git push --follow-tags",
     "version:major": "bun pm version major && git push --follow-tags"

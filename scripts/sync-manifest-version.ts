@@ -20,7 +20,7 @@ if (!newVersion) {
 }
 
 // Read manifest.json
-const manifestPath = join(rootDir, "manifest.json");
+const manifestPath = join(rootDir, "meta", "manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 
 // Update version
@@ -29,4 +29,4 @@ manifest.version = newVersion;
 // Write back with proper formatting (2-space indent, trailing newline)
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
 
-console.log(`Updated manifest.json version to ${newVersion}`);
+console.log(`Updated meta/manifest.json version to ${newVersion}`);

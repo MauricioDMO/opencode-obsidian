@@ -41,13 +41,13 @@ jobs:
       
       - name: Verify manifest version matches tag
         run: |
-          MANIFEST_VERSION=$(jq -r '.version' manifest.json)
+          MANIFEST_VERSION=$(jq -r '.version' meta/manifest.json)
           TAG_VERSION=${{ steps.get_version.outputs.version }}
           if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
-            echo "Error: manifest.json version ($MANIFEST_VERSION) does not match tag version ($TAG_VERSION)"
+            echo "Error: meta/manifest.json version ($MANIFEST_VERSION) does not match tag version ($TAG_VERSION)"
             exit 1
           fi
-          echo "✓ manifest.json version matches tag: $TAG_VERSION"
+          echo "✓ meta/manifest.json version matches tag: $TAG_VERSION"
       
       - name: Build plugin
         run: bun run build
@@ -59,6 +59,6 @@ jobs:
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            manifest.json
-            main.js
-            styles.css
+            dist/manifest.json
+            dist/main.js
+            dist/styles.css

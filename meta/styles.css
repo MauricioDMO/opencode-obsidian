@@ -305,6 +305,8 @@
   padding: 12px 14px;
   background: var(--background-secondary);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  cursor: text;
+  user-select: text;
 }
 
 .opencode-message-user {
@@ -329,6 +331,23 @@
   letter-spacing: 0.5px;
   margin-bottom: 8px;
   color: var(--text-muted);
+  cursor: default;
+  user-select: none;
+}
+
+.opencode-message-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opencode-message-copy {
+  height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.9em;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .opencode-message-role {
@@ -355,10 +374,17 @@
   white-space: nowrap;
 }
 
+.opencode-message-body {
+  cursor: text;
+  user-select: text;
+}
+
 .opencode-message-text {
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.5;
+  cursor: text;
+  user-select: text;
 }
 
 .opencode-message-step {
