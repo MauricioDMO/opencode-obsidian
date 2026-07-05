@@ -138,6 +138,7 @@ export class OpencodeTerminalView extends ItemView {
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(new WebLinksAddon());
     terminal.open(termContainer);
+    terminal.attachCustomKeyEventHandler((event) => this.handleTerminalKeyEvent(event));
 
     try {
       terminal.loadAddon(new WebglAddon());
@@ -284,6 +285,52 @@ export class OpencodeTerminalView extends ItemView {
     if (cmdio && typeof (cmdio as any).write === "function") {
       (cmdio as any).write(`${this.terminal.rows}x${this.terminal.cols}\n`);
     }
+  }
+
+  private normalizeKeyEvent(event: KeyboardEvent): string {
+    const parts: string[] = [];
+    if (event.ctrlKey) {
+      parts.push("ctrl");
+    }
+    if (event.altKey) {
+      parts.push("alt");
+    }
+    if (event.shiftKey) {
+      parts.push("shift");
+    }
+    if (event.metaKey) {
+      parts.push("meta");
+    }
+
+    parts.push(event.key.toLowerCase());
+    return parts.join("+");
+  }
+
+  private handleTerminalKeyEvent(event: KeyboardEvent): boolean {
+    if (event.type === "keyup") {
+      return true;
+    }
+
+    const chord = this.normalizeKeyEvent(event);
+    const action = this.plugin.settings.terminalKeybindings?.[chord];
+    if (!action || action === "disabled") {
+      return true;
+    }
+
+    if (action === "paste") {
+      return true;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (action === "killWordForward") {
+      this.ptyProcess?.stdin?.write("\x1bd");
+    } else if (action === "killWordBackward") {
+      this.ptyProcess?.stdin?.write("\x17");
+    }
+
+    return false;
   }
 
   private registerDropHandlers(termContainer: HTMLElement): void {
