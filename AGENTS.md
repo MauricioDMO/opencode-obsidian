@@ -4,9 +4,9 @@ Guidelines for AI coding agents working on the obsidian-opencode plugin.
 
 ## Project Overview
 
-Obsidian plugin that embeds the OpenCode AI assistant via an iframe. Spawns a local server process and displays its web UI in the Obsidian sidebar.
+Obsidian plugin that runs OpenCode inside an integrated Obsidian terminal. The terminal view starts a PTY-backed child process that executes the configured `opencode` executable with configured CLI arguments and cwd.
 
-**Tech Stack:** TypeScript, Obsidian Plugin API, esbuild, Node.js child processes
+**Tech Stack:** TypeScript, Obsidian Plugin API, esbuild, Node.js child processes, xterm.js
 
 ## Build Commands
 
@@ -21,11 +21,12 @@ Output: `main.js` (CommonJS bundle)
 
 ```
 src/
-├── main.ts           # Plugin entry, extends Plugin
-├── types.ts          # Types and constants
-├── OpenCodeView.ts   # Sidebar view (ItemView) with iframe
-├── ProcessManager.ts # Server process lifecycle
-└── SettingsTab.ts    # Settings UI (PluginSettingTab)
+├── main.ts                            # Plugin entry, commands, terminal/session activation
+├── types.ts                           # Active settings and terminal keybinding types
+├── ui/OpencodeTerminalView.ts         # Integrated terminal view and PTY launch
+├── ui/OpencodeConversationView.ts     # Session browser/export/restore view
+├── settings/OpencodeTerminalSettingTab.ts # Visible settings UI
+└── server/OpencodeEnv.ts              # Environment preparation for OpenCode process
 ```
 
 ## Coding guidelines
@@ -34,9 +35,9 @@ src/
 
 | Type | Convention | Example |
 |------|------------|---------|
-| Classes | PascalCase | `OpenCodePlugin`, `ProcessManager` |
+| Classes | PascalCase | `OpenCodePlugin`, `OpencodeTerminalView` |
 | Interfaces/Types | PascalCase | `OpenCodeSettings`, `ProcessState` |
-| Constants | UPPER_CASE or camelCase | `DEFAULT_SETTINGS`, `OPENCODE_VIEW_TYPE` |
+| Constants | UPPER_CASE or camelCase | `DEFAULT_SETTINGS`, `OPENCODE_TERMINAL_VIEW_TYPE` |
 | Variables/functions | camelCase | `getVaultPath`, `startServer` |
 | Private members | camelCase (no prefix) | `private processManager` |
 | Files | PascalCase (classes), lowercase (entry) | `ProcessManager.ts`, `main.ts` |
@@ -61,8 +62,8 @@ getProcessState(): ProcessState {
 - Register in `onload()`, clean up in `onunload()`
 
 ```typescript
-this.registerView(OPENCODE_VIEW_TYPE, (leaf) => new OpenCodeView(leaf, this));
-this.addCommand({ id: "toggle-view", name: "Toggle panel", callback: () => this.toggleView() });
+this.registerView(OPENCODE_TERMINAL_VIEW_TYPE, (leaf) => new OpencodeTerminalView(leaf, this));
+this.addCommand({ id: "open-opencode-terminal", name: "Open OpenCode Terminal", callback: () => this.activateTerminalView() });
 ```
 
 ### DOM Creation
@@ -74,7 +75,7 @@ container.createEl("button", { text: "Click", cls: "mod-cta" });
 
 ### State Management
 - Callback-based subscriptions
-- Centralized state in manager classes
+- Centralized terminal/session state in `OpenCodePlugin` and view classes
 - Immediate notification on state change
 
 ## Config Summary
@@ -86,7 +87,7 @@ container.createEl("button", { text: "Click", cls: "mod-cta" });
 ## Desktop-Only
 
 Uses Node.js APIs unavailable on mobile:
-- `child_process.spawn()` for server process
+- `child_process.spawn()` for PTY/OpenCode processes
 - File system via vault adapter
 
 Check for desktop environment before adding mobile-incompatible features.

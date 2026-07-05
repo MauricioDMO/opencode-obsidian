@@ -1,9 +1,8 @@
 # OpenCode plugin for Obsidian
 
+Run [OpenCode](https://opencode.ai) inside Obsidian using an integrated terminal.
 
-Give your notes AI capability by embedding Opencode [OpenCode](https://opencode.ai) AI assistant directly in Obsidian:
-
-<img src="./assets/opencode_in_obsidian.png" alt="OpenCode embeded in Obsidian" />
+<img src="./assets/opencode_in_obsidian.png" alt="OpenCode in Obsidian" />
 
 **Use cases:**
 - Summarize and distill long-form content
@@ -11,17 +10,18 @@ Give your notes AI capability by embedding Opencode [OpenCode](https://opencode.
 - Query and explore your knowledge base
 - Generate outlines and structured notes
 
-This plugin uses OpenCode's web view that can be embedded directly into Obsidian window. Usually similar plugins would use the ACP protocol, but I want to see how how much is possible without having to implement (and manage) a custom chat UI - I want the full power of OpenCode in my Obsidian.
+The plugin starts the OpenCode CLI in an Obsidian sidebar terminal. It does not require `opencode serve`, an iframe, a local web server port, or `--cors app://obsidian.md` for its main workflow.
 
-_Note: plugin author is not affiliated with OpenCode or Obsidian - this is a 3rd party software._
+_Note: plugin author is not affiliated with OpenCode or Obsidian - this is 3rd party software._
 
 This repository is maintained by MauricioDMO as a fork of the upstream [mtymek/opencode-obsidian](https://github.com/mtymek/opencode-obsidian) project.
 
 ## Requirements
 
-- Desktop only (uses Node.js child processes)
-- [OpenCode CLI](https://opencode.ai) installed 
-- [Bun](https://bun.sh) installed
+- Desktop only (uses Node.js child processes and a PTY)
+- macOS or Linux for the integrated PTY terminal
+- [OpenCode CLI](https://opencode.ai) installed
+- [Bun](https://bun.sh) installed for development
 
 ## Installation
 
@@ -41,7 +41,7 @@ BRAT will automatically check for updates and notify you when new versions are a
 
 If you want to contribute or develop the plugin:
 
-1. Clone to `.obsidian/plugins/obsidian-opencode` subdirectory under your vault's root:
+1. Clone to `.obsidian/plugins/obsidian-opencode` under your vault root:
    ```bash
    git clone https://github.com/MauricioDMO/opencode-obsidian.git .obsidian/plugins/obsidian-opencode
    ```
@@ -50,51 +50,40 @@ If you want to contribute or develop the plugin:
    bun install && bun run build
    ```
 3. Enable in Obsidian Settings > Community Plugins
-4. Add AGENTS.md to your workspace root to guide the AI assistant
+4. Add `AGENTS.md` to your workspace root to guide the AI assistant if desired
 
 ## Usage
 
-- Click the terminal icon in the ribbon, or
-- `Cmd/Ctrl+Shift+O` to toggle the panel
-- Server starts automatically when you open the panel
+- Click the terminal ribbon icon to open the OpenCode terminal.
+- Run the `Open OpenCode Terminal` command to open the terminal view.
+- Run the `Toggle OpenCode Terminal in Sidebar` command to reveal the right sidebar and open/reveal the terminal there.
+- Run `New OpenCode Session` to restart the terminal with a fresh OpenCode session.
+- Run `Continue Last OpenCode Session` to restart the terminal with `opencode -c`.
+- Click the conversations ribbon icon or run `Open OpenCode Conversations` to browse previous OpenCode sessions.
 
+When the terminal view opens, `src/ui/OpencodeTerminalView.ts` starts a PTY-backed process. The process runs the configured OpenCode executable with the configured arguments and working directory.
+
+Opening a previous conversation with **Restore in Terminal** restarts the terminal with `opencode -s <sessionId>` and uses that session's recorded working directory.
 
 ## Settings
 
-### Custom Command Mode
+The visible settings are defined in `src/settings/OpencodeTerminalSettingTab.ts`.
 
-Enable "Use custom command" when you need more control over how OpenCode starts—for example, to add extra CLI flags, use a custom wrapper script, or run OpenCode through a container or virtual environment.
+- **OpenCode path**: executable to run. Leave as `opencode` to resolve it from `PATH`, or set an absolute path if Obsidian cannot find it.
+- **Default working directory**: cwd for new OpenCode terminal sessions. Leave empty to use the vault root.
+- **Terminal font size**: font size for the integrated terminal.
+- **Terminal font family**: font family for the integrated terminal.
+- **Terminal keybindings**: configurable terminal shortcut handling, such as paste and word deletion.
+- **New session arguments**: extra CLI arguments added when the terminal starts a normal new session, for example `--model provider/model`.
 
-When using custom command:
+The plugin prepares the spawned process environment with `getOpencodeEnv()` from `src/server/OpencodeEnv.ts`. That helper augments `PATH` and default `PNPM_HOME`/`FNM_DIR` values so OpenCode and Node-based runtimes installed through common user-level package managers can be found from Obsidian's Electron process.
 
-- **Hostname and port must match** the values set in the Port and Hostname fields above
-- You **must include `--cors app://obsidian.md`** to allow Obsidian to embed the OpenCode interface
+## Legacy Settings
 
-Example:
-```bash
-opencode serve --port 14096 --hostname 127.0.0.1 --cors app://obsidian.md
-```
+Older versions used an `opencode serve` + iframe workflow. Settings such as `port`, `hostname`, `autoStart`, `defaultViewLocation`, `projectDirectory`, `injectWorkspaceContext`, `customCommand`, and `useCustomCommand` belonged to that legacy path and are not part of the current visible terminal settings.
 
-Other settings (port, hostname, auto-start, view location, context injection) are available through the settings UI and are self-explanatory.
+Do not configure `opencode serve --cors app://obsidian.md` for the current workflow.
 
-### Context injection (experimental)
+## Windows Status
 
-This plugin can automatically inject context to the running OC instance: list of open notes and currently selected text.
-
-Currently, this is work-in-progress feature with some limitations - it won't work when creating new session from OC interface.
-
-## Windows Troubleshooting
-
-If you see "Executable not found at 'opencode'" despite opencode being installed:
-
-1. Find your opencode.cmd path:
-   ```
-   where opencode.cmd
-   ```
-
-2. Configure the full path in plugin settings:
-   ```
-   C:\Users\{username}\AppData\Roaming\npm\opencode.cmd
-   ```
-
-This is due to Electron/Obsidian not fully inheriting PATH on Windows.
+The current integrated PTY terminal is not implemented on Windows. The plugin will show an unsupported notice instead of starting OpenCode there.
