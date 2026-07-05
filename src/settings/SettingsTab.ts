@@ -81,7 +81,7 @@ export class OpenCodeSettingTab extends PluginSettingTab {
     descEl.createEl("br");
     const linkEl = descEl.createEl("a", {
       text: "Learn more",
-      href: "https://github.com/mtymek/opencode-obsidian#custom-command-mode"
+      href: "https://github.com/MauricioDMO/opencode-obsidian#custom-command-mode"
     });
     linkEl.addEventListener("click", (e) => {
       e.preventDefault();

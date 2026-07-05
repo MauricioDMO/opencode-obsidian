@@ -10,7 +10,9 @@ We welcome the following types of contributions:
 - Documentation improvements
 - Bug fixes
 
-**Note:** Core product features and major changes require prior discussion. Please [open an issue](https://github.com/mtymek/opencode-obsidian/issues) first to discuss your proposal before starting work. PRs for new features submitted without prior approval may be closed.
+**Note:** Core product features and major changes require prior discussion. Please [open an issue](https://github.com/MauricioDMO/opencode-obsidian/issues) first to discuss your proposal before starting work. PRs for new features submitted without prior approval may be closed.
+
+This repository is maintained by MauricioDMO as a fork of the upstream [mtymek/opencode-obsidian](https://github.com/mtymek/opencode-obsidian) project.
 
 I'm also interested in collecting a set of Agent Skills useful in the context of Obsidian vaults. Feel free to submit an issue or PR with your ideas.
 
@@ -24,7 +26,7 @@ I'm also interested in collecting a set of Agent Skills useful in the context of
 ### Getting Started
 
 ```bash
-git clone https://github.com/mtymek/opencode-obsidian.git
+git clone https://github.com/MauricioDMO/opencode-obsidian.git
 cd opencode-obsidian
 bun install
 ```

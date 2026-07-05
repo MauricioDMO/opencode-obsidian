@@ -13,7 +13,9 @@ Give your notes AI capability by embedding Opencode [OpenCode](https://opencode.
 
 This plugin uses OpenCode's web view that can be embedded directly into Obsidian window. Usually similar plugins would use the ACP protocol, but I want to see how how much is possible without having to implement (and manage) a custom chat UI - I want the full power of OpenCode in my Obsidian.
 
-_Note: plugin author is not afiliated with OpenCode or Obsidian - this is a 3rd party software._
+_Note: plugin author is not affiliated with OpenCode or Obsidian - this is a 3rd party software._
+
+This repository is maintained by MauricioDMO as a fork of the upstream [mtymek/opencode-obsidian](https://github.com/mtymek/opencode-obsidian) project.
 
 ## Requirements
 
@@ -29,7 +31,7 @@ The easiest way to install this plugin during beta is via [BRAT](https://github.
 
 1. Install the BRAT plugin from Obsidian Community Plugins
 2. Open BRAT settings and click "Add Beta plugin"
-3. Enter: `mtymek/opencode-obsidian`
+3. Enter: `MauricioDMO/opencode-obsidian`
 4. Click "Add Plugin" - BRAT will install the latest release automatically
 5. Enable the OpenCode plugin in Obsidian Settings > Community Plugins
 
@@ -41,7 +43,7 @@ If you want to contribute or develop the plugin:
 
 1. Clone to `.obsidian/plugins/obsidian-opencode` subdirectory under your vault's root:
    ```bash
-   git clone https://github.com/mtymek/opencode-obsidian.git .obsidian/plugins/obsidian-opencode
+   git clone https://github.com/MauricioDMO/opencode-obsidian.git .obsidian/plugins/obsidian-opencode
    ```
 2. Install dependencies and build:
    ```bash
@@ -96,4 +98,3 @@ If you see "Executable not found at 'opencode'" despite opencode being installed
    ```
 
 This is due to Electron/Obsidian not fully inheriting PATH on Windows.
-
