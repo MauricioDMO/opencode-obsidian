@@ -3,7 +3,6 @@ import { DEFAULT_SETTINGS, OpenCodeSettings } from "./types";
 import { OpencodeTerminalSettingTab } from "./settings/OpencodeTerminalSettingTab";
 import { OpencodeTerminalView, OPENCODE_TERMINAL_VIEW_TYPE } from "./ui/OpencodeTerminalView";
 import { OpencodeConversationView, OPENCODE_CONVERSATION_VIEW_TYPE } from "./ui/OpencodeConversationView";
-import { ServerState } from "./server/types";
 
 interface OpencodeSuggestion {
   label: string;
@@ -227,45 +226,8 @@ export default class OpenCodePlugin extends Plugin {
     }
   }
 
-  onServerStateChange(callback: (state: ServerState) => void): () => void {
-    callback("stopped");
-    return () => undefined;
-  }
-
-  getServerState(): ServerState {
-    return "stopped";
-  }
-
-  getLastError(): string | null {
-    return null;
-  }
-
-  getServerUrl(): string {
-    return "";
-  }
-
-  getStoredIframeUrl(): string | null {
-    return null;
-  }
-
-  setCachedIframeUrl(_url: string | null): void {
-    return;
-  }
-
   async startServer(): Promise<boolean> {
     await this.activateTerminalView();
     return true;
-  }
-
-  async stopServer(): Promise<void> {
-    return;
-  }
-
-  refreshContextForView(..._args: unknown[]): void {
-    return;
-  }
-
-  async ensureSessionUrl(..._args: unknown[]): Promise<void> {
-    return;
   }
 }
