@@ -15,7 +15,7 @@ bun install          # Install dependencies
 bun run build        # Production (type-check + bundle)
 ```
 
-Output: `main.js` (CommonJS bundle)
+Output: `dist/main.js`, `dist/manifest.json`, and `dist/styles.css`
 
 ## Project Structure
 

@@ -32,18 +32,18 @@ The system SHALL provide commands to bump patch, minor, and major versions.
 - **AND** the commit and tag SHALL be pushed to origin
 
 ### Requirement: Manifest version synchronization
-During any version bump, the `version` field in `manifest.json` SHALL be automatically updated to match the new package.json version.
+During any version bump, the `version` field in `meta/manifest.json` SHALL be automatically updated to match the new package.json version.
 
 #### Scenario: Synchronized version bump
 - **GIVEN** package.json contains `"version": "0.1.0"`
-- **AND** manifest.json contains `"version": "0.1.0"`
+- **AND** meta/manifest.json contains `"version": "0.1.0"`
 - **WHEN** a developer runs `bun run version:minor`
 - **THEN** package.json SHALL be updated to `"version": "0.2.0"`
-- **AND** manifest.json SHALL be updated to `"version": "0.2.0"`
+- **AND** meta/manifest.json SHALL be updated to `"version": "0.2.0"`
 - **AND** both files SHALL be included in the same git commit
 
 #### Scenario: Manifest structure preservation
-- **GIVEN** manifest.json contains fields: id, name, version, minAppVersion, description, author, isDesktopOnly
+- **GIVEN** meta/manifest.json contains fields: id, name, version, minAppVersion, description, author, isDesktopOnly
 - **WHEN** the version is updated during version bump
 - **THEN** all fields except `version` SHALL remain unchanged
 - **AND** the JSON structure and formatting SHALL be preserved
@@ -71,6 +71,7 @@ When a version tag is pushed, a GitHub Actions workflow SHALL automatically buil
 - **AND** the release SHALL be marked as a pre-release
 - **AND** the release SHALL include the required assets: `manifest.json`, `main.js`, `styles.css`
 - **AND** the released manifest.json SHALL contain the correct version matching the tag
+  These assets are produced in `dist/` before being attached to the release.
 
 #### Scenario: Build failure prevents release
 - **WHEN** the build command fails

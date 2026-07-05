@@ -40,7 +40,7 @@ To work on the plugin during development:
    bun run build  # One-time production build
    ```
 
-2. The plugin will be built to `main.js` in the project root
+2. The plugin will be built to `dist/` with `main.js`, `manifest.json`, and `styles.css`
 
 3. For testing in Obsidian:
    - Enable Community Plugins in Obsidian settings
@@ -73,7 +73,7 @@ bun run version:major   # Bump major version (0.1.0 -> 1.0.0) - breaking changes
 
 1. When you run a version command:
    - `package.json` version is bumped
-   - `manifest.json` is automatically synchronized via the `version` lifecycle script
+   - `meta/manifest.json` is automatically synchronized via the `version` lifecycle script
    - A git commit is created with both files
    - A git tag is created (e.g., `v0.2.0`)
    - The commit and tag are pushed to GitHub
@@ -82,7 +82,7 @@ bun run version:major   # Bump major version (0.1.0 -> 1.0.0) - breaking changes
    - Triggers on the new tag
    - Builds the plugin
    - Creates a GitHub release marked as "pre-release"
-   - Attaches `manifest.json`, `main.js`, and `styles.css`
+   - Attaches `dist/manifest.json`, `dist/main.js`, and `dist/styles.css`
 
 3. BRAT users automatically receive the update
 
@@ -94,7 +94,7 @@ bun run version:minor   # or patch/major as appropriate
 # That's it! The rest is automated.
 ```
 
-**Important:** Always use the version commands - don't create tags manually or update version numbers by hand. The automation keeps `package.json` and `manifest.json` in sync.
+**Important:** Always use the version commands - don't create tags manually or update version numbers by hand. The automation keeps `package.json` and `meta/manifest.json` in sync.
 
 ## Before Submitting a PR
 

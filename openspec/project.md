@@ -115,7 +115,7 @@ Standard feature branch workflow. Commit messages should be concise and describe
 - Check for desktop environment before adding mobile-incompatible features
 
 **Build Output:**
-- Must produce single `main.js` file (CommonJS format)
+- Must produce `dist/main.js` (CommonJS format), `dist/manifest.json`, and `dist/styles.css`
 - External: `obsidian`, `electron`, CodeMirror modules, Node.js builtins
 
 **TypeScript Config:**
