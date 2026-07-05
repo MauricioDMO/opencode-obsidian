@@ -1,4 +1,4 @@
-import { ItemView, moment, Notice, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, moment, Notice, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import { OpencodeCliClient } from "../client/OpencodeCliClient";
 
 export const OPENCODE_CONVERSATION_VIEW_TYPE = "opencode-conversations";
@@ -71,7 +71,6 @@ export class OpencodeConversationView extends ItemView {
       item.createEl("div", { cls: "opencode-session-title", text: session.title || "Untitled" });
       const meta = item.createEl("div", { cls: "opencode-session-meta" });
       meta.createEl("span", { text: moment(session.updated).format("YYYY-MM-DD HH:mm") });
-      meta.createEl("span", { cls: "opencode-session-dir", text: session.directory });
       item.addEventListener("click", async () => {
         this.listContainer?.querySelectorAll(".opencode-session-item").forEach((el) => el.removeClass("is-active"));
         item.addClass("is-active");
@@ -86,13 +85,46 @@ export class OpencodeConversationView extends ItemView {
     }
 
     this.detailContainer.empty();
-    this.detailContainer.createEl("h4", { text: session.title || "Untitled" });
-    const actions = this.detailContainer.createEl("div", { cls: "opencode-session-actions" });
-    actions.createEl("button", { text: "Restore in Terminal", cls: "mod-cta" }).addEventListener("click", () => {
+    this.detailContainer.createEl("div", { cls: "opencode-loading", text: "Loading conversation..." });
+    const data = await this.client.exportSession(session.id);
+    this.detailContainer.empty();
+
+    if (!data) {
+      this.detailContainer.createEl("div", { cls: "opencode-error", text: "Failed to load conversation." });
+      return;
+    }
+
+    this.renderSessionHeader(session, data);
+    this.renderSession(data);
+  }
+
+  private renderSessionHeader(session: any, data: any): void {
+    if (!this.detailContainer) {
+      return;
+    }
+
+    const header = this.detailContainer.createEl("div", { cls: "opencode-session-detail-header" });
+    const heading = header.createEl("div", { cls: "opencode-session-heading" });
+    const titleGroup = heading.createEl("div", { cls: "opencode-session-title-group" });
+    titleGroup.createEl("div", { cls: "opencode-session-detail-title", text: session.title || "Untitled" });
+    titleGroup.createEl("div", {
+      cls: "opencode-session-detail-meta",
+      text: `$${(data.info?.cost || 0).toFixed(4)}`,
+    });
+
+    const actions = heading.createEl("div", { cls: "opencode-session-actions" });
+    this.createIconButton(actions, "arrow-up-to-line", "Ir al inicio").addEventListener("click", () => {
+      this.detailContainer?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    this.createIconButton(actions, "arrow-down-to-line", "Ir al final").addEventListener("click", () => {
+      const container = this.detailContainer;
+      container?.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    });
+    this.createIconButton(actions, "terminal", "Restaurar en terminal", "mod-cta").addEventListener("click", () => {
       void this.plugin.openTerminalWithSession(session.id, session.directory);
     });
-    actions.createEl("button", { text: "Export to Note" }).addEventListener("click", () => void this.exportSessionToNote(session));
-    actions.createEl("button", { text: "Delete", cls: "mod-warning" }).addEventListener("click", async () => {
+    this.createIconButton(actions, "file-output", "Exportar a nota").addEventListener("click", () => void this.exportSessionToNote(session));
+    this.createIconButton(actions, "trash-2", "Eliminar sesión", "mod-warning").addEventListener("click", async () => {
       if (confirm(`Delete session "${session.title}"? This cannot be undone.`)) {
         const ok = await this.client.deleteSession(session.id);
         if (ok) {
@@ -102,17 +134,15 @@ export class OpencodeConversationView extends ItemView {
         }
       }
     });
+  }
 
-    this.detailContainer.createEl("div", { cls: "opencode-loading", text: "Loading conversation..." });
-    const data = await this.client.exportSession(session.id);
-    this.detailContainer.querySelector(".opencode-loading")?.remove();
-
-    if (!data) {
-      this.detailContainer.createEl("div", { cls: "opencode-error", text: "Failed to load conversation." });
-      return;
-    }
-
-    this.renderSession(data);
+  private createIconButton(container: HTMLElement, icon: string, label: string, cls = ""): HTMLButtonElement {
+    const button = container.createEl("button", {
+      cls: ["opencode-icon-button", cls].filter(Boolean).join(" "),
+      attr: { "aria-label": label, title: label },
+    });
+    setIcon(button, icon);
+    return button;
   }
 
   async exportSessionToNote(session: any): Promise<void> {
@@ -147,22 +177,26 @@ export class OpencodeConversationView extends ItemView {
       return;
     }
 
-    const info = this.detailContainer.createEl("div", { cls: "opencode-session-info" });
-    info.createEl("div", { text: `Model: ${data.info?.model?.id || "unknown"}` });
-    info.createEl("div", { text: `Agent: ${data.info?.agent || "default"}` });
-    info.createEl("div", { text: `Cost: $${(data.info?.cost || 0).toFixed(4)}` });
-
     const messages = this.detailContainer.createEl("div", { cls: "opencode-messages" });
     for (const msg of data.messages || []) {
       const role = msg.info.role || "unknown";
       const roleLabel = role === "user" ? "Tú" : role === "assistant" ? "IA" : role;
       const msgEl = messages.createEl("div", { cls: `opencode-message opencode-message-${role}` });
       const header = msgEl.createEl("div", { cls: "opencode-message-header" });
-      header.createEl("span", { cls: "opencode-message-role", text: roleLabel });
+      const labelGroup = header.createEl("div", { cls: "opencode-message-labels" });
+      labelGroup.createEl("span", { cls: "opencode-message-role", text: roleLabel });
+      const messageModel = role === "assistant" ? this.getMessageModel(msg) : "";
+      if (messageModel) {
+        labelGroup.createEl("span", { cls: "opencode-message-model", text: messageModel });
+      }
+      const messageAgent = role === "assistant" ? this.getMessageAgent(msg) : "";
+      if (messageAgent) {
+        labelGroup.createEl("span", { cls: "opencode-message-agent", text: messageAgent });
+      }
       const headerActions = header.createEl("div", { cls: "opencode-message-header-actions" });
       const messageText = this.getMessageText(msg.parts || []);
       if (messageText) {
-        headerActions.createEl("button", { cls: "opencode-message-copy", text: "Copiar" }).addEventListener("click", async (event) => {
+        this.createIconButton(headerActions, "copy", "Copiar mensaje", "opencode-message-copy").addEventListener("click", async (event) => {
           event.stopPropagation();
           try {
             await navigator.clipboard.writeText(messageText);
@@ -184,6 +218,45 @@ export class OpencodeConversationView extends ItemView {
       .map((part) => part.text)
       .join("\n\n")
       .trim();
+  }
+
+  private getMessageModel(message: any): string {
+    const info = message.info || {};
+    const providerId = info.providerID || info.providerId;
+    const modelId = info.modelID || info.modelId;
+    if (typeof providerId === "string" && typeof modelId === "string") {
+      return `${providerId}/${modelId}`;
+    }
+
+    const model = info.model;
+    if (typeof model === "string") {
+      return model;
+    }
+    if (typeof model?.id === "string") {
+      return model.id;
+    }
+    if (typeof modelId === "string") {
+      return modelId;
+    }
+    return "";
+  }
+
+  private getMessageAgent(message: any): string {
+    const info = message.info || {};
+    const agent = info.agent;
+    if (typeof agent === "string") {
+      return agent;
+    }
+    if (typeof agent?.name === "string") {
+      return agent.name;
+    }
+    if (typeof info.agentID === "string") {
+      return info.agentID;
+    }
+    if (typeof info.agentId === "string") {
+      return info.agentId;
+    }
+    return "";
   }
 
   private renderParts(container: HTMLElement, parts: any[]): void {
